@@ -12,19 +12,20 @@
 
 import datetime
 import time
-from dateutil.parser import parse
+
 import jqdatasdk as jq
 from clickhouse_driver import Client
+from dateutil.parser import parse
 from QuadQuanta.config import config
 from QuadQuanta.data.clickhouse_api import (create_clickhouse_database,
                                             create_clickhouse_table,
                                             drop_click_table, insert_clickhouse,
                                             query_exist_date,
                                             query_exist_max_datetime)
-from QuadQuanta.data.mongodb_api import insert_mongodb
 from QuadQuanta.data.data_trans import pd_to_tuplelist
 from QuadQuanta.data.get_data import (get_jq_bars, get_jq_trade_days,
                                       get_trade_days)
+from QuadQuanta.data.mongodb_api import insert_mongodb
 from QuadQuanta.utils.logs import logger
 from tqdm import tqdm
 
@@ -182,7 +183,21 @@ def save_trade_days(database='jqdata'):
                       'trade_days', client)
 
 
-def save_securities_info(code: str = None, db_name='jqdata', coll_name='securities_info'):
+def save_securities_info(code: str = None,
+                         db_name='jqdata',
+                         coll_name='securities_info'):
+    """
+    保存股票概况到mongodb数据库
+
+    Parameters
+    ----------
+    code : str, optional
+        标的六位数字代码, by default None, 表示获取所有标的.
+    db_name : str, optional
+        数据库名, by default 'jqdata'
+    coll_name : str, optional
+        collum名, by default 'securities_info'
+    """
     jq.auth(config.jqusername, config.jqpasswd)
     if code:
         security_info = jq.get_security_info(jq.normalize_code(code))
@@ -195,18 +210,26 @@ def save_securities_info(code: str = None, db_name='jqdata', coll_name='securiti
         # 删除多余键值对
         del security_info_dict['code']
         del security_info_dict['parent']
-        insert_mongodb(db_name=db_name, coll_name=coll_name, documents=security_info_dict)
+        # todo 数据库有数据则更新
+        insert_mongodb(db_name=db_name,
+                       coll_name=coll_name,
+                       documents=security_info_dict)
 
     else:
         securities_info_pd = jq.get_all_securities()
         # 建立mongodb索引
         securities_info_pd['_id'] = securities_info_pd.index
         # 去除jqdata股票代码的后缀
-        securities_info_pd['_id'] = securities_info_pd['_id'].apply(lambda x: x[:6])
-        securities_info_pd['start_date'] = securities_info_pd['start_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
-        securities_info_pd['end_date'] = securities_info_pd['end_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
-
-        insert_mongodb(db_name=db_name, coll_name=coll_name, documents=securities_info_pd.to_dict('records'))
+        securities_info_pd['_id'] = securities_info_pd['_id'].apply(
+            lambda x: x[:6])
+        securities_info_pd['start_date'] = securities_info_pd[
+            'start_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+        securities_info_pd['end_date'] = securities_info_pd['end_date'].apply(
+            lambda x: x.strftime('%Y-%m-%d'))
+        # todo 数据库有数据则更新
+        insert_mongodb(db_name=db_name,
+                       coll_name=coll_name,
+                       documents=securities_info_pd.to_dict('records'))
 
 
 if __name__ == '__main__':
