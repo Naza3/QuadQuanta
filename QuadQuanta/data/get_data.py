@@ -422,7 +422,6 @@ def get_adjust_factor(code,
     NotImplementedError
         [description]
     """
-    jq.auth(config.jqusername, config.jqpasswd)
 
     if isinstance(code, str):
         code = list(map(str.strip, code.split(',')))
@@ -430,6 +429,7 @@ def get_adjust_factor(code,
         raise ValueError('股票代码格式错误')
 
     if datasource == DataSource.JQDATA:
+        jq.auth(config.jqusername, config.jqpasswd)
         return jq.get_price(jq.normalize_code(code),
                             start_date=start_date,
                             end_date=end_date,

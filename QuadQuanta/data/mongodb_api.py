@@ -83,7 +83,7 @@ def insert_mongodb(db_name,
         else:
             raise NotImplementedError
     except DuplicateKeyError:
-        pass
+        logger.warning(DuplicateKeyError)
     except Exception as e:
         logger.warning(e)
 
