@@ -20,6 +20,7 @@ from QuadQuanta.data.mongodb_api import insert_mongodb
 class Account():
     """[summary]
     """
+
     def __init__(self,
                  username=None,
                  passwd=None,
@@ -293,8 +294,12 @@ class Account():
         if self.solid:
             self.save_account_section()
         self.orders = {}
-        for item in self.positions.values():
+        for code in list(self.positions.keys()):
+            item = self.positions[code]
             item.settle()
+            # 清仓第二日后删除position
+            if item.volume_long == 0 and item.hold_days > 2:
+                del self.positions[code]
 
 
 if __name__ == "__main__":
@@ -321,7 +326,6 @@ if __name__ == "__main__":
                          'sell',
                          order_time='2020-01-11 09:34:00')
     acc.make_deal(od3)
-
     acc.settle()
     print(acc.positions_msg)
     # print(pos)

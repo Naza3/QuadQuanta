@@ -36,6 +36,7 @@ class Position():
         self.position_cost = position_cost
         # 卖出冻结
         self.volume_short_frozen = 0
+        # 买入现金冻结
         self.frozen_cash = 0
         self.last_price = 0  # 持仓最新价格
         # 开仓总成本
@@ -68,10 +69,10 @@ class Position():
         [type]
             [description]
         """
-        try:
+        if self.volume_long > 0:
             return round(self.position_cost / self.volume_long, 2)
-        except ZeroDivisionError:
-            return 0
+        else:
+            raise Exception('volume_long非正数')
 
     @property
     def float_profit(self):
@@ -118,11 +119,8 @@ class Position():
         self.volume_short_history += self.volume_short_today
         self.volume_long_today = 0
         self.volume_short_today = 0
-        # 持仓天数
-        if self.volume_long > 0:
-            self.hold_days += 1
-        else:
-            self.hold_days = 0
+        # 持仓天数+1
+        self.hold_days += 1
 
     def update_pos(self, price, update_time):
         """
