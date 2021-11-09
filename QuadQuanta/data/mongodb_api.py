@@ -15,12 +15,13 @@ import pandas as pd
 import pymongo
 from pymongo.errors import DuplicateKeyError
 from QuadQuanta.utils.logs import logger
+from QuadQuanta.config import config
 
 
 def query_mongodb(db_name,
                   coll_name,
                   sql=None,
-                  uri="mongodb://127.0.0.1:27017",
+                  uri=config.mongodb_uri,
                   **kwargs):
     """
     mongodb数据库查询
@@ -59,7 +60,7 @@ def query_mongodb(db_name,
 def insert_mongodb(db_name,
                    coll_name,
                    documents,
-                   uri="mongodb://127.0.0.1:27017"):
+                   uri=config.mongodb_uri):
     """[summary]
 
     Parameters
