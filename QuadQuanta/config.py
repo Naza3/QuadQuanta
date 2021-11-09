@@ -59,6 +59,10 @@ class Config():
     def start_date(self):
         return self.get_start_date()
 
+    @property
+    def mongodb_uri(self):
+        return self.get_mongodb_uri()
+
     def get_jqusername(self):
         yaml_data = self.load_config_yaml()
         return yaml_data['jqdata']['username']
@@ -82,6 +86,11 @@ class Config():
     def get_start_date(self):
         yaml_data = self.load_config_yaml()
         return yaml_data['start_date']
+
+    def get_mongodb_uri(self):
+        yaml_data = self.load_config_yaml()
+        return yaml_data['mongodb']['uri']
+
 
 
 config = Config()

@@ -10,16 +10,15 @@
 @Desc    :   获取数据模块
 '''
 
-# here put the import lib
-from QuadQuanta import config
-from dateutil.parser import parse
-
 import jqdatasdk as jq
 import pandas as pd
+from dateutil.parser import parse
+from QuadQuanta import config
 from QuadQuanta.const import *
 from QuadQuanta.data.clickhouse_api import query_clickhouse, query_N_clickhouse
 from QuadQuanta.data.data_trans import pd_to_tuplelist, tuplelist_to_np
-from QuadQuanta.utils.datetime_func import (datetime_convert_stamp)
+from QuadQuanta.data.mongodb_api import query_mongodb
+from QuadQuanta.utils.datetime_func import datetime_convert_stamp
 from QuadQuanta.utils.logs import logger
 
 
@@ -422,7 +421,6 @@ def get_adjust_factor(code,
     NotImplementedError
         [description]
     """
-    jq.auth(config.jqusername, config.jqpasswd)
 
     if isinstance(code, str):
         code = list(map(str.strip, code.split(',')))
@@ -430,6 +428,7 @@ def get_adjust_factor(code,
         raise ValueError('股票代码格式错误')
 
     if datasource == DataSource.JQDATA:
+        jq.auth(config.jqusername, config.jqpasswd)
         return jq.get_price(jq.normalize_code(code),
                             start_date=start_date,
                             end_date=end_date,
@@ -437,6 +436,33 @@ def get_adjust_factor(code,
                             fq=adj_type)
     else:
         raise NotImplementedError
+
+
+def get_securities_info(code: str = None,
+                        db_name='jqdata',
+                        coll_name='securities_info',
+                        **kwargs):
+    """
+    从mongodb数据库获取标的概况
+
+    Parameters
+    ----------
+    code : str, optional
+        标的六位数字代码, by default None, 表示获取所有标的.
+    db_name : str, optional
+        数据库名, by default 'jqdata'
+    coll_name : str, optional
+        collum名, by default 'securities_info'
+
+    Returns
+    -------
+    kwargs可指定返回值类型, 包括list和pandas结构
+    """
+    if code:
+        sql = {"_id": code}
+    else:
+        sql = None
+    return query_mongodb(db_name, coll_name, sql, **kwargs)
 
 
 if __name__ == '__main__':

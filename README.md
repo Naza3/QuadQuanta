@@ -76,6 +76,10 @@ clickhouse:
   ip: '127.0.0.1'
   user: 'default'
   password: 'yourpasswrod' #无密码则为''
+# mongodb配置
+mongodb:
+  uri: 'mongodb://127.0.0.1:27017'
+
 
 ```
 

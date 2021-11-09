@@ -12,9 +12,10 @@
 
 import datetime
 import time
-from dateutil.parser import parse
+
 import jqdatasdk as jq
 from clickhouse_driver import Client
+from dateutil.parser import parse
 from QuadQuanta.config import config
 from QuadQuanta.data.clickhouse_api import (create_clickhouse_database,
                                             create_clickhouse_table,
@@ -24,10 +25,9 @@ from QuadQuanta.data.clickhouse_api import (create_clickhouse_database,
 from QuadQuanta.data.data_trans import pd_to_tuplelist
 from QuadQuanta.data.get_data import (get_jq_bars, get_jq_trade_days,
                                       get_trade_days)
+from QuadQuanta.data.mongodb_api import insert_mongodb
 from QuadQuanta.utils.logs import logger
 from tqdm import tqdm
-
-jq.auth(config.jqusername, config.jqpasswd)
 
 
 def save_bars(start_time=config.start_date,
@@ -109,7 +109,7 @@ def save_bars(start_time=config.start_date,
         time.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         end_time = end_time + ' 17:00:00'
-
+    jq.auth(config.jqusername, config.jqpasswd)
     # 表不存在则创建相应表
     create_clickhouse_table(frequency, client)
     # 这种方式获取股票列表会有NAN数据，且需要转换股票代码格式
@@ -183,6 +183,55 @@ def save_trade_days(database='jqdata'):
                       'trade_days', client)
 
 
+def save_securities_info(code: str = None,
+                         db_name='jqdata',
+                         coll_name='securities_info'):
+    """
+    保存股票概况到mongodb数据库
+
+    Parameters
+    ----------
+    code : str, optional
+        标的六位数字代码, by default None, 表示获取所有标的.
+    db_name : str, optional
+        数据库名, by default 'jqdata'
+    coll_name : str, optional
+        collum名, by default 'securities_info'
+    """
+    jq.auth(config.jqusername, config.jqpasswd)
+    if code:
+        security_info = jq.get_security_info(jq.normalize_code(code))
+        security_info_dict = security_info.__dict__
+
+        security_info_dict['_id'] = security_info_dict['code'][:6]
+        security_info_dict['start_date'] = str(security_info_dict['start_date'])
+        security_info_dict['end_date'] = str(security_info_dict['end_date'])
+
+        # 删除多余键值对
+        del security_info_dict['code']
+        del security_info_dict['parent']
+        # todo 数据库有数据则更新
+        insert_mongodb(db_name=db_name,
+                       coll_name=coll_name,
+                       documents=security_info_dict)
+
+    else:
+        securities_info_pd = jq.get_all_securities()
+        # 建立mongodb索引
+        securities_info_pd['_id'] = securities_info_pd.index
+        # 去除jqdata股票代码的后缀
+        securities_info_pd['_id'] = securities_info_pd['_id'].apply(
+            lambda x: x[:6])
+        securities_info_pd['start_date'] = securities_info_pd[
+            'start_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+        securities_info_pd['end_date'] = securities_info_pd['end_date'].apply(
+            lambda x: x.strftime('%Y-%m-%d'))
+        # todo 数据库有数据则更新
+        insert_mongodb(db_name=db_name,
+                       coll_name=coll_name,
+                       documents=securities_info_pd.to_dict('records'))
+
+
 if __name__ == '__main__':
     # save_all_jqdata('2014-01-01 09:00:00',
     #                 '2021-05-08 17:00:00',
@@ -191,10 +240,10 @@ if __name__ == '__main__':
     #           '2015-01-01 17:00:00',
     #           frequency='auction',
     #           database='test')
-    save_bars('2020-05-01 09:00:00',
-              '2021-01-01 17:00:00',
-              frequency='minute',
-              database='jqdata_test',
-              continued=False)
-
+    # save_bars('2020-05-01 09:00:00',
+    #           '2021-01-01 17:00:00',
+    #           frequency='minute',
+    #           database='jqdata_test',
+    #           continued=False)
+    save_securities_info('000001')
     # save_trade_days(database='test')

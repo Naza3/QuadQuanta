@@ -37,16 +37,8 @@ class BaseStrategy():
         self.start_date = start_date
         self.end_date = end_date
         self.frequency = frequency
-        # 初始化时加载日线数据
-        logger.info("加载数据中...")
-        self.day_data = get_bars(code, start_date, end_date, 'daily')
-        logger.info("数据加载完成")
-        if code:
-            self.subscribe_code = code
-        else:
-            self.subscribe_code = np.unique(self.day_data['code']).tolist()
-        self.trading_date = np.sort(np.unique(self.day_data['date']))
-        self.trading_datetime = np.sort(np.unique(self.day_data['datetime']))
+        self.code = code
+        self.sys_init()
         self.init()
         self.acc = Account(
             username,
@@ -59,9 +51,27 @@ class BaseStrategy():
             solid,
         )
 
+    def sys_init(self):
+        """
+        系统初始化
+        """
+        # 初始化时加载日线数据
+        logger.info("加载数据中...")
+        self.day_data = get_bars(self.code, self.start_date, self.end_date, self.frequency)
+        logger.info("数据加载完成")
+        if self.code:
+            self.subscribe_code = self.code
+        else:
+            self.subscribe_code = np.unique(self.day_data['code']).tolist()
+        self.trading_date = np.sort(np.unique(self.day_data['date']))
+        self.trading_datetime = np.sort(np.unique(self.day_data['datetime']))
+
     def init(self):
         """
-        策略初始化函数, 初始化回测账户,手续费
+        自定义初始化
+        Returns
+        -------
+
         """
         raise NotImplementedError
 
