@@ -25,7 +25,7 @@ from QuadQuanta.data.clickhouse_api import (create_clickhouse_database,
 from QuadQuanta.data.data_trans import pd_to_tuplelist
 from QuadQuanta.data.get_data import (get_jq_bars, get_jq_trade_days,
                                       get_trade_days)
-from QuadQuanta.data.mongodb_api import insert_mongodb
+from QuadQuanta.data.mongodb_api import save_mongodb
 from QuadQuanta.utils.logs import logger
 from tqdm import tqdm
 
@@ -63,14 +63,14 @@ def save_bars(start_time=config.start_date,
         start_time = str(parse(start_time))
     except Exception as e:
         logger.error(e)
-        logger.info("非法的开始日期，使用2005-01-01作为开始日期")
+        logger.warning("非法的开始日期，使用2005-01-01作为开始日期")
         start_time = '2005-01-01'
 
     try:
         end_time = str(parse(end_time))
     except Exception as e:
         logger.error(e)
-        logger.info("非法的结束日期，使用2100-01-01作为结束日期")
+        logger.warning("非法的结束日期，使用2100-01-01作为结束日期")
         end_time = '2100-01-01'
 
     if start_time < start_time[:10] + ' 09:00:00':
@@ -154,7 +154,7 @@ def save_bars(start_time=config.start_date,
                     # raise Exception('Insert acution error', str(date_range[i])[:10])
                     continue
     else:
-        raise Exception('日期段数据已保存')
+        logger.warning('日期段数据已保存')
 
 
 def save_trade_days(database='jqdata'):
@@ -187,7 +187,7 @@ def save_securities_info(code: str = None,
                          db_name='jqdata',
                          coll_name='securities_info'):
     """
-    保存股票概况到mongodb数据库
+    保存股票概况到mongodb数据库, 主键存在则更新,不存在则插入
 
     Parameters
     ----------
@@ -210,10 +210,9 @@ def save_securities_info(code: str = None,
         # 删除多余键值对
         del security_info_dict['code']
         del security_info_dict['parent']
-        # todo 数据库有数据则更新
-        insert_mongodb(db_name=db_name,
-                       coll_name=coll_name,
-                       documents=security_info_dict)
+        save_mongodb(db_name=db_name,
+                     coll_name=coll_name,
+                     document=security_info_dict)
 
     else:
         securities_info_pd = jq.get_all_securities()
@@ -226,10 +225,10 @@ def save_securities_info(code: str = None,
             'start_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
         securities_info_pd['end_date'] = securities_info_pd['end_date'].apply(
             lambda x: x.strftime('%Y-%m-%d'))
-        # todo 数据库有数据则更新
-        insert_mongodb(db_name=db_name,
-                       coll_name=coll_name,
-                       documents=securities_info_pd.to_dict('records'))
+        documents = securities_info_pd.to_dict('records')
+        for i in tqdm(range(len(documents))):
+            item = documents[i]
+            save_mongodb(db_name=db_name, coll_name=coll_name, document=item)
 
 
 if __name__ == '__main__':
@@ -245,5 +244,5 @@ if __name__ == '__main__':
     #           frequency='minute',
     #           database='jqdata_test',
     #           continued=False)
-    save_securities_info('000001')
+    save_securities_info()
     # save_trade_days(database='test')

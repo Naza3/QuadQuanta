@@ -337,13 +337,13 @@ def get_jq_trade_days(start_time=None, end_time=None, **kwargs):
         start_time = str(parse(start_time))
     except Exception as e:
         logger.error(e)
-        logger.info("非法的开始日期，获取2005-01-01作为开始日期")
+        logger.warning("非法的开始日期，获取2005-01-01作为开始日期")
         start_time = '2005-01-01'
     try:
         end_time = str(parse(end_time))
     except Exception as e:
         logger.error(e)
-        logger.info("非法的结束日期，使用2100-01-01作为结束日期")
+        logger.warning("非法的结束日期，使用2100-01-01作为结束日期")
         end_time = '2100-01-01'
     trade_days = jq.get_trade_days(start_time, end_time)
 

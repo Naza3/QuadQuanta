@@ -14,8 +14,8 @@ import pandas as pd
 # here put the import lib
 import pymongo
 from pymongo.errors import DuplicateKeyError
-from QuadQuanta.utils.logs import logger
 from QuadQuanta.config import config
+from QuadQuanta.utils.logs import logger
 
 
 def query_mongodb(db_name,
@@ -55,12 +55,10 @@ def query_mongodb(db_name,
         return pd.DataFrame(list(collection.find(sql))).set_index('_id')
     else:
         raise NotImplementedError
+    client.close()
 
 
-def insert_mongodb(db_name,
-                   coll_name,
-                   documents,
-                   uri=config.mongodb_uri):
+def insert_mongodb(db_name, coll_name, documents, uri=config.mongodb_uri):
     """[summary]
 
     Parameters
@@ -87,6 +85,34 @@ def insert_mongodb(db_name,
         logger.warning(DuplicateKeyError)
     except Exception as e:
         logger.warning(e)
+    client.close()
+
+
+def save_mongodb(db_name, coll_name, document, uri=config.mongodb_uri):
+    """
+    保存mongodb数据库，主键存在就更新，不存在就插入
+
+    Parameters
+    ----------
+    db_name : str
+        [description]
+    coll_name : str
+        集合名
+    documents : list
+        文档
+    uri : str, optional
+        mongodb uri, by default 'mongodb://127.0.0.1:27017'
+    """
+    client = pymongo.MongoClient(uri)
+    collection = client[db_name][coll_name]
+    try:
+        if isinstance(document, dict):
+            collection.save(document)
+        else:
+            raise NotImplementedError
+    except Exception as e:
+        logger.warning(e)
+    client.close()
 
 
 if __name__ == '__main__':
