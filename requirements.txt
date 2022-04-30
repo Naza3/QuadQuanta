@@ -5,5 +5,5 @@ numpy
 clickhouse_driver
 PyYAML
 loguru
-pymongo
+pymongo==3.12.1
 matplotlib

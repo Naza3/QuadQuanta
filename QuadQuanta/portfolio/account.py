@@ -137,7 +137,7 @@ class Account():
 
         """
         pos = self.get_position(code)
-        pos.update_pos(price, self.datetime)
+        # pos.update_pos(price, self.datetime)
         if order_direction == 'buy':
             if self.available_cash >= volume * price:  # 可用资金大于买入需要资金
                 volume = volume
@@ -311,14 +311,9 @@ if __name__ == "__main__":
                         order_time='2020-01-10 09:32:00')
     acc.make_deal(od)
 
-    od2 = acc.send_order('000002',
-                         100,
-                         12,
-                         'buy',
-                         order_time='2020-01-10 09:33:00')
-    acc.make_deal(od2)
     print(acc.positions_msg)
     acc.settle()
+    print(acc.positions_msg)
     # print(pos)
     od3 = acc.send_order('000001',
                          100,
@@ -326,7 +321,7 @@ if __name__ == "__main__":
                          'sell',
                          order_time='2020-01-11 09:34:00')
     acc.make_deal(od3)
-    acc.settle()
     print(acc.positions_msg)
+    acc.settle()
     # print(pos)
     # print(acc.total_market_value)

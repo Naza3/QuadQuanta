@@ -16,7 +16,7 @@ persist/
 .tmp.pkl
 .env
 history*
-strategy/
+qstrategy/
 *.egg-info/
 .VSCodeCounter/
 docs/
@@ -25,3 +25,4 @@ SOD.*
 drawio*
 .*
 dev
+QuadQuantaQt/

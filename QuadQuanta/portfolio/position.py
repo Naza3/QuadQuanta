@@ -71,6 +71,8 @@ class Position():
         """
         if self.volume_long > 0:
             return round(self.position_cost / self.volume_long, 2)
+        elif self.volume_long == 0:
+            return 0
         else:
             raise Exception('volume_long非正数')
 
