@@ -26,3 +26,6 @@ drawio*
 .*
 dev
 QuadQuantaQt/
+polars_exc/
+tmp.*
+server/

@@ -463,7 +463,14 @@ def get_securities_info(code: str = None,
     else:
         sql = None
     return query_mongodb(db_name, coll_name, sql, **kwargs)
+def get_jq_call_auction():
+    """
+    获取集合竞价数据
+    Returns
+    -------
 
+    """
+    pass
 
 if __name__ == '__main__':
     # print(

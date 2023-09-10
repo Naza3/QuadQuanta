@@ -22,6 +22,8 @@ def query_mongodb(db_name,
                   coll_name,
                   sql=None,
                   uri=config.mongodb_uri,
+                  sort_id='_id',
+                  sort_type=1,
                   **kwargs):
     """
     mongodb数据库查询
@@ -36,6 +38,10 @@ def query_mongodb(db_name,
         查询语句, by default None, None表示返回所有
     uri : str, optional
         mongodb uri, by default 'mongodb://127.0.0.1:27017'
+    sort_id : str
+        排序字段
+    sort_type :
+        排序类型,1表示升序，-1表示降序
 
     Returns
     -------
@@ -50,9 +56,9 @@ def query_mongodb(db_name,
     client = pymongo.MongoClient(uri)
     collection = client[db_name][coll_name]
     if kwargs.get('format') == None:
-        return list(collection.find(sql))
+        return list(collection.find(sql).sort(sort_id, sort_type))
     elif kwargs.get('format') in ['pd', 'pandas']:
-        return pd.DataFrame(list(collection.find(sql))).set_index('_id')
+        return pd.DataFrame(list(collection.find(sql).sort(sort_id, sort_type))).set_index('_id')
     else:
         raise NotImplementedError
     client.close()
@@ -116,5 +122,5 @@ def save_mongodb(db_name, coll_name, document, uri=config.mongodb_uri):
 
 
 if __name__ == '__main__':
-    data = query_mongodb('Stock', 'Nmodel', format='pd')
-    print(data)
+    data = query_mongodb('QuadQuanta', 'N_limit')
+    print(data[0])

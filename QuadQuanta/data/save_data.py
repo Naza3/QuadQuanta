@@ -245,4 +245,4 @@ if __name__ == '__main__':
     #           database='jqdata_test',
     #           continued=False)
     save_securities_info()
-    # save_trade_days(database='test')
+    # save_trade_days()
