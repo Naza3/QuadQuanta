@@ -17,5 +17,5 @@ from . import portfolio
 from . import utils
 from .config import *
 
-__version__ = '0.3.9'
+__version__ = '0.4.0'
 __author__ = 'levonwoo'
