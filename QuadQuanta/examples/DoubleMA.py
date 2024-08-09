@@ -12,8 +12,6 @@
 
 # here put the import lib
 import numpy as np
-import time
-import matplotlib.pyplot as plt
 import talib
 from tqdm import tqdm
 
@@ -109,8 +107,6 @@ class DoubleMA(BaseStrategy):
         print(
             f"total_assets: {self.account.total_assets}, total_profit_ratio: {self.account.profit_ratio}"
         )
-        plt.plot(self.total_assert)
-        plt.show()
 
 
 if __name__ == '__main__':
