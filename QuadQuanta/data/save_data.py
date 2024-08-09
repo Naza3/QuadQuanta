@@ -1,19 +1,23 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   fetch_jqdata.py
 @Time    :   2021/05/07
 @Author  :   levonwoo
 @Version :   0.1
-@Contact :   
+@Contact :
 @License :   (C)Copyright 2020-2021
 @Desc    :   None
-'''
+"""
 
 import datetime
+import re
 import time
+import os
+import numpy as np
 
 import jqdatasdk as jq
+import pandas as pd
 from clickhouse_driver import Client
 from dateutil.parser import parse
 from QuadQuanta.config import config
@@ -157,6 +161,89 @@ def save_bars(start_time=config.start_date,
         logger.warning('日期段数据已保存')
 
 
+def save_bars_from_json(filename,
+                        frequency='daily',
+                        database='jqdata',
+                        continued=True):
+    """
+    从文件保存聚宽股票数据到clickhouse
+
+    Parameters
+    ----------
+    filename : 文件名称
+        文件名：默认以日期+json后缀组成
+    frequency : str, optional
+        数据频率, by default 'daily'
+    database : str, optional
+        数据库名, by default 'jqdata'
+    continued : bool, optional
+        是否接着最大日期更新,防止重复插入数据, by default True
+
+    Raises
+    ------
+    Exception
+        [description]
+    Exception
+        [description]
+    """
+    try:
+        # 判断文件是否存在
+        if not (os.path.exists(filename)):
+            raise FileNotFoundError("未找到文件")
+
+        # 提取filename中的日期信息
+        current_date_str = re.search(r"\d{4}-\d{2}-\d{2}", filename).group()
+        current_date = datetime.datetime.strptime(current_date_str, "%Y-%m-%d")
+
+        client = Client(host=config.clickhouse_IP,
+                        user=config.clickhouse_user,
+                        password=config.clickhouse_password)
+        create_clickhouse_database(database, client)
+        client = Client(host=config.clickhouse_IP,
+                        user=config.clickhouse_user,
+                        password=config.clickhouse_password,
+                        database=database)
+
+        if continued:
+            exist_max_datetime = query_exist_max_datetime(None, frequency,
+                                                          client)[0][0]
+            if exist_max_datetime > current_date:
+                raise Exception("当前日期已保存")
+        pd_data = pd.read_json(filename)
+        pd_data = pd_data.dropna(axis=0, how='any')  # 删除包含NAN的行
+        if len(pd_data) > 1000:
+            pd_data['datetime'] = pd_data['time'].apply(lambda x: x / 1000)
+            pd_data = pd_data.assign(
+                amount=pd_data['money'],
+                code=pd_data['code'].apply(lambda x: x[:6]),  # code列聚宽格式转为六位纯数字格式
+                date=pd_data['datetime'].apply(
+                    lambda x: str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(x)))[0:10]),
+                date_stamp=pd_data['datetime']).set_index('datetime',
+                                                          drop=True,
+                                                          inplace=False)
+            base_keys_list = [
+                'datetime', 'code', 'open', 'close', 'high', 'low', 'volume', 'amount',
+                'avg', 'high_limit', 'low_limit', 'pre_close', 'date', 'date_stamp'
+            ]
+            from collections import OrderedDict
+            rawdata = OrderedDict().fromkeys(base_keys_list)
+            # 加上15个小时时间戳，收盘15：00
+            rawdata['datetime'] = list(
+                map(
+                    lambda x: datetime.datetime.utcfromtimestamp(x + 3600 * 15), pd_data.index.values))
+            for filed, series in pd_data.iteritems():
+                if filed in rawdata.keys():
+                    rawdata[filed] = series.tolist()
+            data = list(map(tuple, zip(*list(rawdata.values()))))
+
+            create_clickhouse_table(frequency, client)
+            insert_clickhouse(data, frequency, client)
+        else:
+            raise Exception("数据不足，请检查json文件")
+    except Exception as e:
+        logger.error(e)
+
+
 def save_trade_days(database='jqdata'):
     """
     从聚宽数据源更新交易日历
@@ -231,6 +318,36 @@ def save_securities_info(code: str = None,
             save_mongodb(db_name=db_name, coll_name=coll_name, document=item)
 
 
+def get_workdays_np(start_date, end_date):
+    dates = np.arange(start_date, end_date, dtype='datetime64[D]')
+    weekdays = np.is_busday(dates)
+    workdays = dates[weekdays]
+    return workdays
+
+
+def save_data_from_json(start_date, end_date,continued=True):
+    """
+
+    Parameters
+    ----------
+    start_date
+    end_date
+    continued : bool, optional
+        是否接着最大日期更新,防止重复插入数据, by default True
+    Returns
+    -------
+
+    """
+
+    trade_days = get_workdays_np(start_date, end_date)
+    for day in trade_days:
+        current_filename = f"./json/{str(day)}.json"
+        logger.info(current_filename)
+        save_bars_from_json(current_filename,continued=continued)
+
+
+
+
 if __name__ == '__main__':
     # save_all_jqdata('2014-01-01 09:00:00',
     #                 '2021-05-08 17:00:00',
@@ -244,5 +361,6 @@ if __name__ == '__main__':
     #           frequency='minute',
     #           database='jqdata_test',
     #           continued=False)
-    save_securities_info()
+    # save_securities_info()
     # save_trade_days()
+    save_data_from_json('2024-07-28','2024-07-31')

@@ -16,7 +16,7 @@ persist/
 .tmp.pkl
 .env
 history*
-qstrategy/
+QuadQuanta/qstrategy/
 *.egg-info/
 .VSCodeCounter/
 docs/

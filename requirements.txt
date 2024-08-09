@@ -1,9 +1,9 @@
-tqdm
-jqdatasdk
-pandas
-numpy
-clickhouse_driver
-PyYAML
-loguru
+clickhouse_driver==0.2.3
+jqdatasdk==1.8.10
+loguru==0.6.0
+numpy==1.22.3
+pandas==1.4.0
 pymongo==3.12.1
-matplotlib
+python_dateutil==2.8.2
+PyYAML==6.0
+tqdm==4.64.0

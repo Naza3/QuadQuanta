@@ -11,7 +11,11 @@
 '''
 
 # here put the import lib
-from QuadQuanta.config import *
+from . import core
+from . import data
+from . import portfolio
+from . import utils
+from .config import *
 
-__version__ = '0.3.7'
+__version__ = '0.3.9'
 __author__ = 'levonwoo'

@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   clickhouse_api.py
 @Time    :   2021/05/07
 @Author  :   levonwoo
 @Version :   0.2
-@Contact :   
+@Contact :
 @License :   (C)Copyright 2020-2021
 @Desc    :   clickhouse接口
-'''
+"""
 
-import time
 from itertools import chain
 
 # here put the import lib
@@ -39,7 +38,7 @@ def create_clickhouse_database(database: str,
     client.execute(create_database_sql)
 
 
-def create_clickhouse_table(type: str,
+def create_clickhouse_table(data_type: str,
                             client: Client = Client(host='127.0.0.1',
                                                     database='jqdata')):
     """
@@ -47,7 +46,7 @@ def create_clickhouse_table(type: str,
 
     Parameters
     ----------
-    type : str
+    data_type : str
         存储表类型,已完成的有日线（daily）,一分钟线(minute),开盘竞价,交易日历
     client : Client, optional
         clickhouse的客户端连接, by default Client(host='127.0.0.1', database='jqdata')
@@ -57,24 +56,31 @@ def create_clickhouse_table(type: str,
     NotImplementedError
         [description]
     """
-    if type in ['min', 'minute', '1min']:
+    if data_type in ['min', 'minute', '1min']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_min (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
                            high_limit Float32,low_limit Float32,pre_close Float32, date String, date_stamp Float64) \
                             ENGINE = MergeTree() ORDER BY (datetime, code)'
 
-    elif type in ['d', 'day', '1day', 'daily']:
+    elif data_type in ['d', 'day', '1day', 'daily']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_day (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
                            high_limit Float32,low_limit Float32,pre_close Float32, date String, date_stamp Float64) \
                             ENGINE = MergeTree() ORDER BY (datetime, code)'
+    # 原始日线数据
+    elif data_type in ['rawDay']:
+        create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_raw_day (datetime DateTime,code String, open Float32, \
+                           close Float32,high Float32,low Float32, volume Float64, amount Float64, date String, \
+                            date_stamp Float64)  ENGINE = MergeTree() ORDER BY (datetime, code)'
 
-    elif type in ['auction', 'call_auction']:
+    elif data_type in ['auction', 'call_auction']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS call_auction (datetime DateTime,code String, close Float32, \
-                           volume Float64, amount Float64, date String, date_stamp Float64) ENGINE = MergeTree() ORDER BY (datetime, code)'
+                           volume Float64, amount Float64, date String, date_stamp Float64) ENGINE = MergeTree() ' \
+                           'ORDER BY (datetime, code)'
 
-    elif type in ['trade_days']:
-        create_table_sql = 'CREATE TABLE IF NOT EXISTS trade_days (datetime Date, date String) ENGINE = MergeTree() ORDER BY (datetime)'
+    elif data_type in ['trade_days']:
+        create_table_sql = 'CREATE TABLE IF NOT EXISTS trade_days (datetime Date, date String) ENGINE = MergeTree() ' \
+                           'ORDER BY (datetime)'
     else:
         raise NotImplementedError
     client.execute(create_table_sql)
@@ -98,7 +104,7 @@ def drop_click_table(table_name: str,
 
 
 def insert_clickhouse(data,
-                      type,
+                      data_type,
                       client: Client = Client(host='127.0.0.1',
                                               database='jqdata')):
     """
@@ -108,7 +114,7 @@ def insert_clickhouse(data,
     ----------
     data : tuple_list
         元组数组类型数据,每个元组为一行
-    type : str
+    data_type : str
         存储表类型,已完成的有日线（daily）,一分钟线(minute),开盘竞价,交易日历
     client : Client, optional
         clickhouse的客户端连接, by default Client(host='127.0.0.1', database='jqdata')
@@ -118,17 +124,22 @@ def insert_clickhouse(data,
     NotImplementedError
         [description]
     """
-    if type in ['min', 'minute', '1min']:
+    if data_type in ['min', 'minute', '1min']:
         insert_data_sql = 'INSERT INTO stock_min (datetime, code, open, close, high, low, volume, amount,\
              avg, high_limit, low_limit, pre_close, date, date_stamp) VALUES'
 
-    elif type in ['d', 'day', '1day', 'daily']:
+    elif data_type in ['d', 'day', '1day', 'daily']:
         insert_data_sql = 'INSERT INTO stock_day (datetime, code, open, close, high, low, volume, amount,\
              avg, high_limit, low_limit, pre_close, date, date_stamp) VALUES'
 
-    elif type in ['auction', 'call_auction']:
+    elif data_type in ['rawDay']:
+        insert_data_sql = 'INSERT INTO stock_raw_day (datetime, code, open, close, high, low, volume, amount,\
+            date, date_stamp) VALUES'
+
+    elif data_type in ['auction', 'call_auction']:
         insert_data_sql = 'INSERT INTO call_auction (datetime, code, close, volume, amount, date, date_stamp) VALUES'
-    elif type in ['trade_days']:
+
+    elif data_type in ['trade_days']:
         insert_data_sql = 'INSERT INTO trade_days (datetime, date) VALUES'
     else:
         raise NotImplementedError
@@ -252,7 +263,8 @@ def query_exist_date(code=None,
     if code:
         if isinstance(code, str):
             code = list(map(str.strip, code.split(',')))
-        sql = "SELECT DISTINCT x.date FROM %s x" % table_name + " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`date`)"
+        sql = "SELECT DISTINCT x.date FROM %s x" % table_name + \
+              " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`date`)"
         # 查询,返回数据类型为元组数组
         res_tuple_list = client.execute(sql, {
             'start_time': start_time,
@@ -260,7 +272,8 @@ def query_exist_date(code=None,
             'code': code
         })
     else:
-        sql = "SELECT DISTINCT x.date FROM %s x" % table_name + " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s  ORDER BY (`date`)"
+        sql = "SELECT DISTINCT x.date FROM %s x" % table_name + \
+              " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s  ORDER BY (`date`)"
         res_tuple_list = client.execute(sql, {
             'start_time': start_time,
             'end_time': end_time,
@@ -545,10 +558,10 @@ if __name__ == '__main__':
     client = Client(host=config.clickhouse_IP,
                     user=config.clickhouse_user,
                     password=config.clickhouse_password, database='jqdata')
-    # print((query_exist_date(start_time='2020-01-01',
-    #                         end_time='2020-05-11',
-    #                         client=client)))
-    print((query_N_clickhouse(2, '000001', end_time='2021-05-20')))
+    print((query_exist_date(start_time='2020-01-01',
+                            end_time='2020-05-11',
+                            client=client)))
+    # print((query_N_clickhouse(2, '000001', end_time='2021-05-20')))
     # print(query_exist_max_datetime(code=['000001'], type='daily',
     #                                client=client))
     # create_clickhouse_table('trade_days', client)

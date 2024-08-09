@@ -24,9 +24,12 @@ setup(
     version=VERSION,
     description='To build a quantification system',  # 描述
     long_description='try to build a personal trading system',
-    packages=find_packages(where='.',
-                           exclude=(["QuadQuanta.strategy"]),
-                           include=('*', )),
+    # packages=find_packages(where='QuadQuanta',
+    #                        # exclude=(["examples,tests"]),
+    #                        include=('*')),
+    packages=find_packages(),
+    # packages = ['QuadQuanta','QuadQuanta.core','QuadQuanta.data','QuadQuanta.portfolio',''],
+    # package_dir={'': 'QuadQuanta'},
     author=AUTHOR,
     author_email='',
     license='MIT license',
@@ -43,5 +46,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
 )
