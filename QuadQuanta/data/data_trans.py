@@ -100,7 +100,13 @@ def pd_to_tuplelist(pd_data, frequency):
     elif frequency in ['trade_days']:
         base_keys_list = ['datetime', 'date']
     rawdata = OrderedDict().fromkeys(base_keys_list)
-
+    # TODO
+    # utcfromtimestamp 在python 3.11之后将启用转为带时区参数的 fromtimestamp
+    # 可更改为，待测试
+    # map(
+    #     lambda x: datetime.datetime.fromtimestamp(
+    #         x.astype(datetime.datetime) / pow(10, 9),datetime.UTC),
+    #     pd_data.index.values)
     if frequency in ['min', 'minute', '1min']:
         rawdata['datetime'] = list(
             map(
