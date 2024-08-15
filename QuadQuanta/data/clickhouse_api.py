@@ -14,16 +14,17 @@ from itertools import chain
 
 # here put the import lib
 import numpy as np
-from clickhouse_driver import Client
+# from clickhouse_driver import Client
+from clickhouse_connect import get_client, driver
 from dateutil.parser import parse
 from QuadQuanta.config import config
-from QuadQuanta.data.data_trans import tuplelist_to_np
+from QuadQuanta.data.data_trans import list_to_tuplelist, split_strings_in_list, tuplelist_to_np
 from QuadQuanta.utils.common import is_sorted, removeDuplicates
 from QuadQuanta.utils.logs import logger
 
 
 def create_clickhouse_database(database: str,
-                               client: Client = Client(host='127.0.0.1')):
+                               client: driver.client.Client):
     """
     数据库不存在则创建clickhouse数据库
 
@@ -31,16 +32,17 @@ def create_clickhouse_database(database: str,
     ----------
     database : str
         数据库名
-    client : Client, optional
-        clickhouse客户端连接, by default Client(host='127.0.0.1')
+    client : clickhouse_connect.driver.client.Client, optional
+        clickhouse客户端连接
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
     create_database_sql = 'CREATE DATABASE IF NOT EXISTS %s' % database
-    client.execute(create_database_sql)
+    client.command(create_database_sql)
 
 
 def create_clickhouse_table(data_type: str,
-                            client: Client = Client(host='127.0.0.1',
-                                                    database='jqdata')):
+                            client: driver.client.Client):
     """
     创建clickhouse数据表
 
@@ -56,6 +58,9 @@ def create_clickhouse_table(data_type: str,
     NotImplementedError
         [description]
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
+
     if data_type in ['min', 'minute', '1min']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_min (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
@@ -83,12 +88,11 @@ def create_clickhouse_table(data_type: str,
                            'ORDER BY (datetime)'
     else:
         raise NotImplementedError
-    client.execute(create_table_sql)
+    client.command(create_table_sql)
 
 
 def drop_click_table(table_name: str,
-                     client: Client = Client(host='127.0.0.1',
-                                             database='jqdata')):
+                     client: driver.client.Client):
     """
     丢弃clickhouse表
 
@@ -96,17 +100,18 @@ def drop_click_table(table_name: str,
     ----------
     table_name : str
         要丢弃的表名
-    client : Client, optional
-        clickhouse的客户端连接, by default Client(host='127.0.0.1', database='jqdata')
+    client : clickhouse_connect.driver.client.Client, optional
+        clickhouse的客户端连接, by default get_client(host='127.0.0.1', database='jqdata')
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
     drop_sql = "DROP TABLE IF EXISTS %s" % table_name
-    client.execute(drop_sql)
+    client.command(drop_sql)
 
 
 def insert_clickhouse(data,
                       data_type,
-                      client: Client = Client(host='127.0.0.1',
-                                              database='jqdata')):
+                      client: driver.client.Client):
     """
     将数据插入clickhouse数据库
 
@@ -116,14 +121,17 @@ def insert_clickhouse(data,
         元组数组类型数据,每个元组为一行
     data_type : str
         存储表类型,已完成的有日线（daily）,一分钟线(minute),开盘竞价,交易日历
-    client : Client, optional
-        clickhouse的客户端连接, by default Client(host='127.0.0.1', database='jqdata')
+    client : clickhouse_connect.driver.client.Client, optional
+        clickhouse的客户端连接, by default get_client(host='127.0.0.1', database='jqdata')
 
     Raises
     ------
     NotImplementedError
         [description]
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
+
     if data_type in ['min', 'minute', '1min']:
         insert_data_sql = 'INSERT INTO stock_min (datetime, code, open, close, high, low, volume, amount,\
              avg, high_limit, low_limit, pre_close, date, date_stamp) VALUES'
@@ -143,13 +151,15 @@ def insert_clickhouse(data,
         insert_data_sql = 'INSERT INTO trade_days (datetime, date) VALUES'
     else:
         raise NotImplementedError
-    client.execute(insert_data_sql, data, types_check=True)
+    # TODO
+    # client.command(da)
+    # client.insert_df()
+    # client.command(cmd=insert_data_sql, data=data)
 
 
 def query_exist_max_datetime(code=None,
                              type='daily',
-                             client: Client = Client(host='127.0.0.1',
-                                                     database='jqdata')):
+                             client: driver.client.Client = None):
     """
     查询clickhouse表中某个code已经存在的最大日期, code=None表示表中的所有code
 
@@ -159,8 +169,8 @@ def query_exist_max_datetime(code=None,
         六位数股票代码列表,如['000001'], ['000001',...,'689009'], by default None
     type : str, optional
         数据类型,已完成的有日线（daily）,一分钟线(minute),竞价(call_auction),交易日历(trade_days), by default 'daily'
-    client : clickhouse_driver.Client, optional
-        clickhouse客户端连接, by default Client(host='127.0.0.1', database='jqdata')
+    client : clickhouse_connect.driver.client.Client, optional
+        clickhouse的客户端连接, by default get_client(host='127.0.0.1', database='jqdata')
 
     Returns
     -------
@@ -172,6 +182,9 @@ def query_exist_max_datetime(code=None,
     NotImplementedError
         [description]
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
+
     if isinstance(code, str):
         code = list(map(str.strip, code.split(',')))
 
@@ -187,10 +200,10 @@ def query_exist_max_datetime(code=None,
         if isinstance(code, str):
             code = list(map(str.strip, code.split(',')))
         max_datetime_sql = 'SELECT max(datetime) FROM %s' % table_name + ' ' + 'WHERE `code` IN %(code)s'
-        res = client.execute(max_datetime_sql, {'code': code})
+        res = client.command(max_datetime_sql, {'code': code})
     else:
         max_datetime_sql = 'SELECT max(datetime) FROM %s' % table_name
-        res = client.execute(max_datetime_sql)
+        res = client.command(max_datetime_sql)
 
     return res
 
@@ -199,8 +212,7 @@ def query_exist_date(code=None,
                      start_time='2000-01-01',
                      end_time='2200-01-01',
                      frequency='daily',
-                     client: Client = Client(host='127.0.0.1',
-                                             database='jqdata')):
+                     client: driver.client.Client = None):
     """
     查询clickhouse表中code在指定日期区间内已保存数据的日期列表, code=None表示表中的所有code
 
@@ -214,8 +226,8 @@ def query_exist_date(code=None,
         [description], by default '2200-01-01'
     frequency : str, optional
         数据类型,已完成的有日线（daily）,一分钟线(minute),竞价(call_auction), by default 'daily'
-    client : clickhouse_driver.Client, optional
-        clickhouse客户端连接, by default Client(host='127.0.0.1', database='jqdata')
+    client : clickhouse_connect.driver.client.Client, optional
+        clickhouse的客户端连接, by default get_client(host='127.0.0.1', database='jqdata')
 
     Returns
     -------
@@ -231,6 +243,9 @@ def query_exist_date(code=None,
     Exception
         [description]
     """
+    if not client:
+        client = get_client(host='127.0.0.1', database='jqdata')
+
     if frequency in ['day', 'daily', 'd']:
         table_name = 'stock_day'
     elif frequency in ['min', 'minute', '1min']:
@@ -265,8 +280,8 @@ def query_exist_date(code=None,
             code = list(map(str.strip, code.split(',')))
         sql = "SELECT DISTINCT x.date FROM %s x" % table_name + \
               " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`date`)"
-        # 查询,返回数据类型为元组数组
-        res_tuple_list = client.execute(sql, {
+        # 查询,返回数据类型为字符串
+        res_str: str = client.command(sql, {
             'start_time': start_time,
             'end_time': end_time,
             'code': code
@@ -274,12 +289,13 @@ def query_exist_date(code=None,
     else:
         sql = "SELECT DISTINCT x.date FROM %s x" % table_name + \
               " WHERE `date` >= %(start_time)s AND `date` <= %(end_time)s  ORDER BY (`date`)"
-        res_tuple_list = client.execute(sql, {
+        res_str = client.command(sql, {
             'start_time': start_time,
             'end_time': end_time,
         })
-    # tuple_list转list
-    res = list(chain(*np.array(res_tuple_list).tolist()))
+        print(type(res_str))
+    # str转list
+    res = res_str.split('\n')
     return res
 
 
@@ -356,10 +372,10 @@ def query_clickhouse(code: list = None,
     if start_time > end_time:
         raise ValueError('开始时间大于结束时间')
 
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password,
-                    database=database)
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password,
+                        database=database)
 
     if code:
         if isinstance(code, str):
@@ -369,8 +385,8 @@ def query_clickhouse(code: list = None,
         sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
                         AND `datetime` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`datetime`, `code`)"
 
-        # 查询,返回数据类型为元组数组
-        res_tuple_list = client.execute(sql, {
+        # 查询,返回数据类型为数组且含有'\n'
+        res_list = client.command(sql, {
             'start_time': start_time,
             'end_time': end_time,
             'code': code
@@ -383,7 +399,7 @@ def query_clickhouse(code: list = None,
             sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
                                     AND `datetime` <= %(end_time)s ORDER BY (`datetime`)"
 
-        res_tuple_list = client.execute(sql, {
+        res_list = client.command(sql, {
             'start_time': start_time,
             'end_time': end_time
         })
@@ -395,8 +411,9 @@ def query_clickhouse(code: list = None,
     # else:
     #     raise Exception('clickhouse返回列表非有序')
 
+    res_split_list = split_strings_in_list(res_list)
+    res_tuple_list = list_to_tuplelist(res_split_list, table_name)
     # 元组数组通过numpy结构化,注意数据长度code:8字符 date:10字符.可能存在问题
-
     return tuplelist_to_np(res_tuple_list, table_name)
 
 
@@ -457,19 +474,19 @@ def query_N_clickhouse(count: int,
         if end_time < end_time[:10] + ' 09:00:00':
             end_time = end_time[:10] + ' 17:00:00'
 
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password,
-                    database=database)
-    # DESC 降序
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password,
+                        database=database)
+    # DESC 降序 使 LIMIT 返回离 end_time 最近的数据
     if code:
         if isinstance(code, str):
             code = list(map(str.strip, code.split(',')))
         sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` <= %(end_time)s \
         AND `code` IN %(code)s ORDER BY (`datetime`, `code`) DESC LIMIT %(limit)s by `code`"
 
-        # 查询,返回数据类型为元组数组
-        res_tuple_list = client.execute(sql, {
+        # 查询,返回数据类型为数组
+        res_list = client.command(sql, {
             'end_time': end_time,
             'code': code,
             'limit': count,
@@ -482,91 +499,37 @@ def query_N_clickhouse(count: int,
             sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` <= %(end_time)s \
             ORDER BY (`datetime`) DESC LIMIT %(limit)s"
 
-        res_tuple_list = client.execute(sql, {
+        res_list = client.command(sql, {
             'end_time': end_time,
             'limit': count,
         })
-    # 将倒序列表翻转
-    res_tuple_list.reverse()
-    # 默认有序条件下删除res_tuple_list重复数据
-    # if is_sorted(res_tuple_list):
-    #     res_tuple_list = removeDuplicates(res_tuple_list)
-    # else:
-    #     raise Exception('clickhouse返回列表非有序')
+
+    res_split_list = split_strings_in_list(res_list)
     # 元组数组通过numpy结构化,注意数据长度code:8字符 date:10字符.可能存在问题
-
-    return tuplelist_to_np(res_tuple_list, table_name)
-
-
-def query_limit_count(code: list = None,
-                      start_time: str = '1970-01-01',
-                      end_time: str = '2200-01-01',
-                      table_name='stock_day_limit',
-                      database='jqdata_test') -> np.ndarray:
-    # TODO 日期解析
-    try:
-        start_time = str(parse(start_time))
-        end_time = str(parse(end_time))
-    except Exception as e:
-        logger.error(e)
-    #  判断日期合法
-    if start_time > end_time:
-        raise ValueError('开始时间大于结束时间')
-
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password,
-                    database=database)
-
-    if code:
-        if isinstance(code, str):
-            # TODO 是否是有效的股票代码
-            code = list(map(str.strip, code.split(',')))
-        # 注意WHERE前的空格
-        sql = "SELECT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
-                        AND `datetime` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`datetime`, `code`)"
-
-        # 查询,返回数据类型为元组数组
-        res_tuple_list = client.execute(sql, {
-            'start_time': start_time,
-            'end_time': end_time,
-            'code': code
-        })
-    else:
-        sql = "SELECT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
-                                AND `datetime` <= %(end_time)s ORDER BY (`datetime`, `code`)"
-
-        res_tuple_list = client.execute(sql, {
-            'start_time': start_time,
-            'end_time': end_time
-        })
-    #  TODO clickhouse分片
-
-    # 默认有序条件下删除res_tuple_list重复数据
-    if is_sorted(res_tuple_list):
-        res_tuple_list = removeDuplicates(res_tuple_list)
-    else:
-        raise Exception('clickhouse返回列表非有序')
-    # 元组数组通过numpy结构化,注意数据长度code:8字符 date:10字符.可能存在问题
-
-    return np.array(res_tuple_list,
-                    dtype=[('datetime', 'object'), ('code', 'U8'),
-                           ('date', 'U10'), ('limit', 'u8')])
+    # 倒序列表翻转
+    res_tuplelist = list_to_tuplelist(res_split_list, table_name)
+    res_tuplelist.reverse()
+    return tuplelist_to_np(res_tuplelist, table_name)
 
 
 if __name__ == '__main__':
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password, database='jqdata')
-    print((query_exist_date(start_time='2020-01-01',
-                            end_time='2020-05-11',
-                            client=client)))
-    # print((query_N_clickhouse(2, '000001', end_time='2021-05-20')))
-    # print(query_exist_max_datetime(code=['000001'], type='daily',
-    #                                client=client))
-    # create_clickhouse_table('trade_days', client)
-    # print((query_clickhouse(start_time='2014-05-20 09',
-    #                         end_time='2014-05-20 10',
-    #                         frequency='minute',
+    # clickclient = get_client(host=config.clickhouse_IP, port=8123,
+    #                          username=config.clickhouse_user,
+    #                          password=config.clickhouse_password, database='clicktest')
+    # create_clickhouse_table('trade_days', client=clickclient)
+    # drop_click_table('stock_min', clickclient)
+    clickclient = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
+    # print((query_exist_date(code='000001',start_time='2020-01-01',
+    #                                 end_time='2020-05-11',
+    #                                 client=clickclient)))
+
+    print(query_exist_max_datetime(code=None, type='daily',
+                                   client=clickclient))
+    # print((query_clickhouse(start_time='2014-05-20',
+    #                         end_time='2014-05-22',
+    #                         frequency='daily',
     #                         database='jqdata')))
+    # print((query_N_clickhouse(2, '000001', end_time='2021-05-20')))
     # insert_clickhouse()

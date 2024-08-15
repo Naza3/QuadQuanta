@@ -18,7 +18,8 @@ import numpy as np
 
 import jqdatasdk as jq
 import pandas as pd
-from clickhouse_driver import Client
+# from clickhouse_driver import Client
+from clickhouse_connect import get_client, driver
 from dateutil.parser import parse
 from QuadQuanta.config import config
 from QuadQuanta.data.clickhouse_api import (create_clickhouse_database,
@@ -87,14 +88,14 @@ def save_bars(start_time=config.start_date,
         raise Exception('开始日期大于结束日期')
 
     # 强制转换start_time, end_time时间改为9:00:00和17:00
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password)
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password)
     create_clickhouse_database(database, client)
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password,
-                    database=database)
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password,
+                        database=database)
 
     current_hour = datetime.datetime.now().hour
     today = datetime.datetime.today()
@@ -187,6 +188,8 @@ def save_bars_from_json(filename,
         [description]
     """
     try:
+        # 默认表为空
+        table_name = ''
         # 判断文件是否存在
         if not (os.path.exists(filename)):
             raise FileNotFoundError("未找到文件")
@@ -195,18 +198,19 @@ def save_bars_from_json(filename,
         current_date_str = re.search(r"\d{4}-\d{2}-\d{2}", filename).group()
         current_date = datetime.datetime.strptime(current_date_str, "%Y-%m-%d")
 
-        client = Client(host=config.clickhouse_IP,
-                        user=config.clickhouse_user,
-                        password=config.clickhouse_password)
+        client = get_client(host=config.clickhouse_IP,
+                            username=config.clickhouse_user,
+                            password=config.clickhouse_password)
         create_clickhouse_database(database, client)
-        client = Client(host=config.clickhouse_IP,
-                        user=config.clickhouse_user,
-                        password=config.clickhouse_password,
-                        database=database)
+        client = get_client(host=config.clickhouse_IP,
+                            username=config.clickhouse_user,
+                            password=config.clickhouse_password,
+                            database=database)
 
         if continued:
             exist_max_datetime = query_exist_max_datetime(None, frequency,
-                                                          client)[0][0]
+                                                          client)[:10]
+            exist_max_datetime = datetime.datetime.strptime(exist_max_datetime, "%Y-%m-%d")
             if exist_max_datetime > current_date:
                 raise Exception("当前日期已保存")
         pd_data = pd.read_json(filename)
@@ -219,25 +223,28 @@ def save_bars_from_json(filename,
                 date=pd_data['datetime'].apply(
                     lambda x: str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(x)))[0:10]),
                 date_stamp=pd_data['datetime']).set_index('datetime',
-                                                          drop=True,
+                                                          drop=False,
                                                           inplace=False)
+            # datetime时间戳转Datetime,# 加上7个小时时间戳，表示收盘UTC+8的15：00
+            pd_data['datetime'] = pd_data['datetime'].map(lambda x: datetime.datetime.utcfromtimestamp(x + 3600 * 7))
+
+            pd_data.drop(columns=['time', 'money'], inplace=True)
+
+            if frequency in ['d', 'day', '1day', 'daily']:
+                table_name = 'stock_day'
+            elif frequency in ['min', 'minute', '1min']:
+                table_name = 'stock_min'
+            else:
+                raise NotImplementedError
+
             base_keys_list = [
                 'datetime', 'code', 'open', 'close', 'high', 'low', 'volume', 'amount',
                 'avg', 'high_limit', 'low_limit', 'pre_close', 'date', 'date_stamp'
             ]
-            from collections import OrderedDict
-            rawdata = OrderedDict().fromkeys(base_keys_list)
-            # 加上15个小时时间戳，收盘15：00
-            rawdata['datetime'] = list(
-                map(
-                    lambda x: datetime.datetime.utcfromtimestamp(x + 3600 * 15), pd_data.index.values))
-            for filed, series in pd_data.iteritems():
-                if filed in rawdata.keys():
-                    rawdata[filed] = series.tolist()
-            data = list(map(tuple, zip(*list(rawdata.values()))))
-
+            # 更改列顺序匹配clichhouse表
+            pd_data = pd_data.reindex(columns=base_keys_list)
             create_clickhouse_table(frequency, client)
-            insert_clickhouse(data, frequency, client)
+            client.insert_df(table_name, pd_data)
         else:
             raise Exception("数据不足，请检查json文件")
     except Exception as e:
@@ -245,6 +252,7 @@ def save_bars_from_json(filename,
 
 
 def save_trade_days(database='jqdata'):
+    # TODO 待更新更改了clickhouse-connect后需要测试
     """
     从聚宽数据源更新交易日历
 
@@ -254,14 +262,14 @@ def save_trade_days(database='jqdata'):
         database名称, by default 'jqdata'
     """
     # 强制转换start_time, end_time时间改为9:00:00和17:00
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password)
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password)
     create_clickhouse_database(database, client)
-    client = Client(host=config.clickhouse_IP,
-                    user=config.clickhouse_user,
-                    password=config.clickhouse_password,
-                    database=database)
+    client = get_client(host=config.clickhouse_IP,
+                        username=config.clickhouse_user,
+                        password=config.clickhouse_password,
+                        database=database)
 
     # 删除原表, 重新更新
     drop_click_table('trade_days', client)
@@ -325,7 +333,7 @@ def get_workdays_np(start_date, end_date):
     return workdays
 
 
-def save_data_from_json(start_date, end_date,continued=True):
+def save_data_from_json(start_date, end_date, continued=True):
     """
 
     Parameters
@@ -343,9 +351,7 @@ def save_data_from_json(start_date, end_date,continued=True):
     for day in trade_days:
         current_filename = f"./json/{str(day)}.json"
         logger.info(current_filename)
-        save_bars_from_json(current_filename,continued=continued)
-
-
+        save_bars_from_json(current_filename, continued=continued)
 
 
 if __name__ == '__main__':
@@ -363,4 +369,5 @@ if __name__ == '__main__':
     #           continued=False)
     # save_securities_info()
     # save_trade_days()
-    save_data_from_json('2024-07-28','2024-07-31')
+    save_bars_from_json('../qstrategy/replay/daily_replay/json/2024-08-15.json', database="jqtest", continued=False)
+    # save_data_from_json('2024-07-28', '2024-07-31')
