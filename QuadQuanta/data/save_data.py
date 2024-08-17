@@ -225,17 +225,24 @@ def save_bars_from_json(filename,
                 date_stamp=pd_data['datetime']).set_index('datetime',
                                                           drop=False,
                                                           inplace=False)
-            # datetime时间戳转Datetime,# 加上7个小时时间戳，表示收盘UTC+8的15：00
-            pd_data['datetime'] = pd_data['datetime'].map(lambda x: datetime.datetime.utcfromtimestamp(x + 3600 * 7))
-
-            pd_data.drop(columns=['time', 'money'], inplace=True)
-
             if frequency in ['d', 'day', '1day', 'daily']:
                 table_name = 'stock_day'
+                # datetime时间戳转Datetime,# 加上7个小时时间戳，表示收盘UTC+8的15：00
+                pd_data['datetime'] = pd_data['datetime'].map(
+                    lambda x: datetime.datetime.utcfromtimestamp(x + 3600 * 7))
+
             elif frequency in ['min', 'minute', '1min']:
                 table_name = 'stock_min'
+                # datetime时间戳转Datetime,# 减去8小时时间戳。从utc时间转为UTC+8
+                pd_data['datetime'] = pd_data['datetime'].map(
+                    lambda x: datetime.datetime.utcfromtimestamp(x-3600 * 8))
+                pd_data['date_stamp'] = pd_data['date_stamp'].map(
+                    lambda x: x - 3600 * 8)
+
             else:
                 raise NotImplementedError
+
+            pd_data.drop(columns=['time', 'money'], inplace=True)
 
             base_keys_list = [
                 'datetime', 'code', 'open', 'close', 'high', 'low', 'volume', 'amount',
@@ -369,5 +376,10 @@ if __name__ == '__main__':
     #           continued=False)
     # save_securities_info()
     # save_trade_days()
-    save_bars_from_json('../qstrategy/replay/daily_replay/json/2024-08-15.json', database="jqtest", continued=False)
-    # save_data_from_json('2024-07-28', '2024-07-31')
+    # save_bars_from_json('../qstrategy/replay/daily_replay/json/2024-08-15.json', database="jqtest", continued=False)
+    file_name = '../qstrategy/data/min/2024-08-15/min2024-08-15-0.json'
+    logger.info(f"file name: {file_name}")
+    save_bars_from_json(file_name, frequency='min', database="clicktest",
+                        continued=False)
+
+# save_data_from_json('2024-07-28', '2024-07-31')
