@@ -61,12 +61,13 @@ def create_clickhouse_table(data_type: str,
     if not client:
         client = get_client(host='127.0.0.1', database='jqdata')
 
+    # 设置分区 PARTITION BY to YYYYMMDD(datetime)
     if data_type in ['min', 'minute', '1min']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_min (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
                            high_limit Float32,low_limit Float32,pre_close Float32, date String, date_stamp Float64) \
-                            ENGINE = MergeTree() ORDER BY (datetime, code)'
-
+                            ENGINE = MergeTree() PARTITION BY toYYYYMMDD(datetime) ORDER BY (datetime, code)'
+    # TODO 按年设置分区 PARTITION BY toYYYY(datetime)
     elif data_type in ['d', 'day', '1day', 'daily']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_day (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
@@ -513,20 +514,20 @@ def query_N_clickhouse(count: int,
 
 
 if __name__ == '__main__':
-    # clickclient = get_client(host=config.clickhouse_IP, port=8123,
-    #                          username=config.clickhouse_user,
-    #                          password=config.clickhouse_password, database='clicktest')
-    # create_clickhouse_table('trade_days', client=clickclient)
-    # drop_click_table('stock_min', clickclient)
     clickclient = get_client(host=config.clickhouse_IP, port=8123,
                              username=config.clickhouse_user,
-                             password=config.clickhouse_password, database='jqdata')
+                             password=config.clickhouse_password, database='clicktest')
+    create_clickhouse_table('min', client=clickclient)
+    # drop_click_table('stock_min', clickclient)
+    # clickclient = get_client(host=config.clickhouse_IP, port=8123,
+    #                          username=config.clickhouse_user,
+    #                          password=config.clickhouse_password, database='jqdata')
     # print((query_exist_date(code='000001',start_time='2020-01-01',
     #                                 end_time='2020-05-11',
     #                                 client=clickclient)))
 
-    print(query_exist_max_datetime(code=None, type='daily',
-                                   client=clickclient))
+    # print(query_exist_max_datetime(code=None, type='daily',
+    #                                client=clickclient))
     # print((query_clickhouse(start_time='2014-05-20',
     #                         end_time='2014-05-22',
     #                         frequency='daily',
