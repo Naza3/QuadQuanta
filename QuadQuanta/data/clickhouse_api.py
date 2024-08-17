@@ -67,12 +67,11 @@ def create_clickhouse_table(data_type: str,
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
                            high_limit Float32,low_limit Float32,pre_close Float32, date String, date_stamp Float64) \
                             ENGINE = MergeTree() PARTITION BY toYYYYMMDD(datetime) ORDER BY (datetime, code)'
-    # TODO 按年设置分区 PARTITION BY toYYYY(datetime)
     elif data_type in ['d', 'day', '1day', 'daily']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_day (datetime DateTime,code String, open Float32, \
                            close Float32,high Float32,low Float32, volume Float64, amount Float64,avg Float32,  \
                            high_limit Float32,low_limit Float32,pre_close Float32, date String, date_stamp Float64) \
-                            ENGINE = MergeTree() ORDER BY (datetime, code)'
+                            ENGINE = MergeTree() PARTITION BY toYYYYMM(datetime) ORDER BY (datetime, code)'
     # 原始日线数据
     elif data_type in ['rawDay']:
         create_table_sql = 'CREATE TABLE IF NOT EXISTS stock_raw_day (datetime DateTime,code String, open Float32, \
@@ -383,8 +382,9 @@ def query_clickhouse(code: list = None,
             # TODO 是否是有效的股票代码
             code = list(map(str.strip, code.split(',')))
         # 注意WHERE前的空格
-        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
-                        AND `datetime` <= %(end_time)s AND `code` IN %(code)s ORDER BY (`datetime`, `code`)"
+        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s " \
+                                                             " AND `datetime` <= %(end_time)s AND `code` IN %(code)s " \
+                                                             "ORDER BY (`datetime`, `code`)"
 
         # 查询,返回数据类型为数组且含有'\n'
         res_list = client.command(sql, {
@@ -393,12 +393,14 @@ def query_clickhouse(code: list = None,
             'code': code
         })
     else:
-        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
-                                AND `datetime` <= %(end_time)s ORDER BY (`datetime`, `code`)"
+        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s " \
+                                                             "AND `datetime` <= %(end_time)s" \
+                                                             " ORDER BY (`datetime`, `code`)"
 
         if table_name == 'trade_days':
-            sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s \
-                                    AND `datetime` <= %(end_time)s ORDER BY (`datetime`)"
+            sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s" \
+                                                                 " AND `datetime` <= %(end_time)s " \
+                                                                 "ORDER BY (`datetime`)"
 
         res_list = client.command(sql, {
             'start_time': start_time,
@@ -516,7 +518,7 @@ def query_N_clickhouse(count: int,
 if __name__ == '__main__':
     clickclient = get_client(host=config.clickhouse_IP, port=8123,
                              username=config.clickhouse_user,
-                             password=config.clickhouse_password, database='clicktest')
+                             password=config.clickhouse_password, database='jqdata')
     create_clickhouse_table('min', client=clickclient)
     # drop_click_table('stock_min', clickclient)
     # clickclient = get_client(host=config.clickhouse_IP, port=8123,
