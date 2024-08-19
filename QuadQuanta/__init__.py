@@ -3,7 +3,6 @@
 '''
 @File    :   __init__.py
 @Time    :   2021/05/09
-@Author  :   levonwoo
 @Version :   0.1
 @Contact :   
 @License :   (C)Copyright 2020-2021
@@ -17,5 +16,5 @@ from . import portfolio
 from . import utils
 from .config import *
 
-__version__ = '0.4.0'
-__author__ = 'levonwoo'
+__version__ = '0.5.0'
+__author__ = 'Naza3'
