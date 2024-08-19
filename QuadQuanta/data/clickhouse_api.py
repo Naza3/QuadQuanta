@@ -11,7 +11,8 @@
 """
 
 from itertools import chain
-
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 # here put the import lib
 import numpy as np
 # from clickhouse_driver import Client
@@ -425,6 +426,7 @@ def query_N_clickhouse(count: int,
                        end_time: str = '2200-01-01',
                        frequency='daily',
                        database='jqdata',
+                       start_time: str = None,
                        **kwargs) -> np.ndarray:
     """
     获取结束日期之前的N个时间序列数据
@@ -435,6 +437,8 @@ def query_N_clickhouse(count: int,
         时间序列个数
     code : list, optional
         股票代码列表, by default None
+    start_time : str, optional
+        结束时间, by default '2014-01-01'
     end_time : str, optional
         结束时间, by default '2200-01-01'
     frequency : str, optional
@@ -477,6 +481,21 @@ def query_N_clickhouse(count: int,
         if end_time < end_time[:10] + ' 09:00:00':
             end_time = end_time[:10] + ' 17:00:00'
 
+    if not start_time:
+        if table_name == 'stock_day':
+            # 日线查询默认默认查询一个月之内
+            start_date = (
+                    datetime.strptime(end_time[:10], "%Y-%m-%d")  # 转换为 datetime 对象
+                    - relativedelta(months=1)  # 向前推一个月
+            ).strftime("%Y-%m-%d")
+            start_time = start_date + ' 09:00:00'
+        elif table_name == 'stock_min':
+            # 分钟线查询默认查询一天内
+            start_time = end_time[:10] + ' 09:00:00'
+        else:
+            # 从数据库保存的起点查询
+            start_time = '2014-01-01'
+
     client = get_client(host=config.clickhouse_IP,
                         username=config.clickhouse_user,
                         password=config.clickhouse_password,
@@ -485,24 +504,26 @@ def query_N_clickhouse(count: int,
     if code:
         if isinstance(code, str):
             code = list(map(str.strip, code.split(',')))
-        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` <= %(end_time)s \
+        sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s AND`datetime` <= %(end_time)s \
         AND `code` IN %(code)s ORDER BY (`datetime`, `code`) DESC LIMIT %(limit)s by `code`"
 
         # 查询,返回数据类型为数组
         res_list = client.command(sql, {
+            'start_time': start_time,
             'end_time': end_time,
             'code': code,
             'limit': count,
         })
     else:
-        sql = "SELECT DISTINCT x.* FROM %s x " % table_name + " WHERE `datetime` <= %(end_time)s \
+        sql = "SELECT DISTINCT x.* FROM %s x " % table_name + " WHERE `datetime` >= %(start_time)s AND`datetime` <= %(end_time)s \
         ORDER BY (`datetime`, `code`) DESC LIMIT %(limit)s by `code`"
 
         if table_name == 'trade_days':
-            sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` <= %(end_time)s \
+            sql = "SELECT DISTINCT x.* FROM %s x" % table_name + " WHERE `datetime` >= %(start_time)s AND `datetime` <= %(end_time)s \
             ORDER BY (`datetime`) DESC LIMIT %(limit)s"
 
         res_list = client.command(sql, {
+            'start_time': start_time,
             'end_time': end_time,
             'limit': count,
         })
@@ -534,5 +555,5 @@ if __name__ == '__main__':
     #                         end_time='2014-05-22',
     #                         frequency='daily',
     #                         database='jqdata')))
-    # print((query_N_clickhouse(2, '000001', end_time='2021-05-20')))
+    print((query_N_clickhouse(2, '000001', frequency='min',end_time='2024-05-20 15:00:00')))
     # insert_clickhouse()
