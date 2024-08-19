@@ -235,7 +235,7 @@ def save_bars_from_json(filename,
                 table_name = 'stock_min'
                 # datetime时间戳转Datetime,# 减去8小时时间戳。从utc时间转为UTC+8
                 pd_data['datetime'] = pd_data['datetime'].map(
-                    lambda x: datetime.datetime.utcfromtimestamp(x-3600 * 8))
+                    lambda x: datetime.datetime.utcfromtimestamp(x - 3600 * 8))
                 pd_data['date_stamp'] = pd_data['date_stamp'].map(
                     lambda x: x - 3600 * 8)
 
@@ -340,13 +340,16 @@ def get_workdays_np(start_date, end_date):
     return workdays
 
 
-def save_data_from_json(start_date, end_date, continued=True):
+def save_data_from_json(start_date, end_date, frequency='daily', database='jqdata', prefix='./',continued=True):
     """
 
     Parameters
     ----------
     start_date
     end_date
+    frequency
+    database
+    prefix : 文件名前缀
     continued : bool, optional
         是否接着最大日期更新,防止重复插入数据, by default True
     Returns
@@ -356,9 +359,22 @@ def save_data_from_json(start_date, end_date, continued=True):
 
     trade_days = get_workdays_np(start_date, end_date)
     for day in trade_days:
-        current_filename = f"./json/{str(day)}.json"
-        logger.info(current_filename)
-        save_bars_from_json(current_filename, continued=continued)
+        if frequency in ['d', 'day', 'daily']:
+            # 当从其他文件调用时，相对路径就不对了
+            # current_filename = f"../qstrategy/data/day/{str(day)}.json"
+            current_filename = f"{prefix}{str(day)}.json"
+
+            logger.info(current_filename)
+            save_bars_from_json(current_filename, frequency=frequency, database=database, continued=continued)
+        elif frequency in ['min', 'minute']:
+            day = str(day)
+            month = day[:7]
+            for i in range(10):
+                current_filename = f"{prefix}{month}/{day}/min{day}-{str(i)}.json"
+                logger.info(current_filename)
+                save_bars_from_json(current_filename, frequency=frequency, database=database, continued=continued)
+        else:
+            raise NotImplementedError
 
 
 if __name__ == '__main__':
@@ -377,9 +393,19 @@ if __name__ == '__main__':
     # save_securities_info()
     # save_trade_days()
     # save_bars_from_json('../qstrategy/replay/daily_replay/json/2024-08-15.json', database="jqtest", continued=False)
-    file_name = '../qstrategy/data/min/2024-08-15/min2024-08-15-0.json'
-    logger.info(f"file name: {file_name}")
-    save_bars_from_json(file_name, frequency='min', database="clicktest",
-                        continued=False)
+
+
+    today_date = "2024-08-12"
+    trade_days = get_workdays_np('2024-01-01', '2024-02-01')
+    for day in reversed(trade_days):
+        day = str(day)
+        month = day[:7]
+        for i in range(10):
+            file_name = f"../../../../BackUp/DATA/{month}/{day}/min{day}-{str(i)}.json"
+
+            # file_name = f"../qstrategy/data/min/{day}/min{day}-{str(i)}.json"
+            logger.info(f"file name: {file_name}")
+            save_bars_from_json(file_name, frequency='min', database="jqdata",
+                                continued=True)
 
 # save_data_from_json('2024-07-28', '2024-07-31')
