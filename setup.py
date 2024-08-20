@@ -17,7 +17,7 @@ with io.open('QuadQuanta/__init__.py', 'rt', encoding='utf8') as f:
 with open('requirements.txt') as reqs_file:
     INSTALL_REQUIRES = reqs_file.readlines()
 
-URL = "https://github.com/levonwoo/QuadQuanta"
+URL = "https://github.com/Naza3/QuadQuanta"
 
 setup(
     name='QuadQuanta',  # 模块名称
