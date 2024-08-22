@@ -16,5 +16,5 @@ from . import portfolio
 from . import utils
 from .config import *
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 __author__ = 'Naza3'

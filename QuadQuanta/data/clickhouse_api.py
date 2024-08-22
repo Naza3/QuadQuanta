@@ -423,10 +423,11 @@ def query_clickhouse(code: list = None,
 
 def query_N_clickhouse(count: int,
                        code: list = None,
+                       start_time: str = None,
                        end_time: str = '2200-01-01',
                        frequency='daily',
                        database='jqdata',
-                       start_time: str = None,
+
                        **kwargs) -> np.ndarray:
     """
     获取结束日期之前的N个时间序列数据
@@ -555,5 +556,5 @@ if __name__ == '__main__':
     #                         end_time='2014-05-22',
     #                         frequency='daily',
     #                         database='jqdata')))
-    print((query_N_clickhouse(2, '000001', frequency='min',end_time='2024-05-20 15:00:00')))
+    print((query_N_clickhouse(2, '000001', frequency='min', end_time='2024-05-20 15:00:00')))
     # insert_clickhouse()

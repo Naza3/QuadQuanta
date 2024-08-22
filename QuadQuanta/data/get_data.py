@@ -256,7 +256,7 @@ def get_click_bars(code=None,
         [description]
     """
     if count:
-        res = query_N_clickhouse(count, code, end_time, frequency, **kwargs)
+        res = query_N_clickhouse(count, code, start_time, end_time, frequency, **kwargs)
         try:
             if kwargs['format'] in ['pd', 'pandas']:
                 return pd.DataFrame(res).set_index('datetime')
@@ -463,6 +463,8 @@ def get_securities_info(code: str = None,
     else:
         sql = None
     return query_mongodb(db_name, coll_name, sql, **kwargs)
+
+
 def get_jq_call_auction():
     """
     获取集合竞价数据
@@ -471,6 +473,7 @@ def get_jq_call_auction():
 
     """
     pass
+
 
 if __name__ == '__main__':
     # print(

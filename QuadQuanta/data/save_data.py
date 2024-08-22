@@ -396,7 +396,7 @@ if __name__ == '__main__':
 
 
     today_date = "2024-08-12"
-    trade_days = get_workdays_np('2024-01-01', '2024-02-01')
+    trade_days = get_workdays_np('2023-10-01', '2024-01-01')
     for day in reversed(trade_days):
         day = str(day)
         month = day[:7]
@@ -406,6 +406,6 @@ if __name__ == '__main__':
             # file_name = f"../qstrategy/data/min/{day}/min{day}-{str(i)}.json"
             logger.info(f"file name: {file_name}")
             save_bars_from_json(file_name, frequency='min', database="jqdata",
-                                continued=True)
+                                continued=False)
 
 # save_data_from_json('2024-07-28', '2024-07-31')
