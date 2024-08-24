@@ -37,7 +37,9 @@ def create_clickhouse_database(database: str,
         clickhouse客户端连接
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password)
     create_database_sql = 'CREATE DATABASE IF NOT EXISTS %s' % database
     client.command(create_database_sql)
 
@@ -60,7 +62,9 @@ def create_clickhouse_table(data_type: str,
         [description]
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
 
     # 设置分区 PARTITION BY to YYYYMMDD(datetime)
     if data_type in ['min', 'minute', '1min']:
@@ -105,7 +109,9 @@ def drop_click_table(table_name: str,
         clickhouse的客户端连接, by default get_client(host='127.0.0.1', database='jqdata')
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
     drop_sql = "DROP TABLE IF EXISTS %s" % table_name
     client.command(drop_sql)
 
@@ -131,7 +137,9 @@ def insert_clickhouse(data,
         [description]
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
 
     if data_type in ['min', 'minute', '1min']:
         insert_data_sql = 'INSERT INTO stock_min (datetime, code, open, close, high, low, volume, amount,\
@@ -184,7 +192,9 @@ def query_exist_max_datetime(code=None,
         [description]
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
 
     if isinstance(code, str):
         code = list(map(str.strip, code.split(',')))
@@ -245,7 +255,9 @@ def query_exist_date(code=None,
         [description]
     """
     if not client:
-        client = get_client(host='127.0.0.1', database='jqdata')
+        client = get_client(host=config.clickhouse_IP, port=8123,
+                             username=config.clickhouse_user,
+                             password=config.clickhouse_password, database='jqdata')
 
     if frequency in ['day', 'daily', 'd']:
         table_name = 'stock_day'
@@ -305,6 +317,7 @@ def query_clickhouse(code: list = None,
                      end_time: str = '2200-01-01',
                      frequency='daily',
                      database='jqdata',
+                     client: driver.client.Client = None,
                      **kwargs) -> np.ndarray:
     """
     clickhouse查询接口,默认为None的条件,返回所有数据
@@ -321,7 +334,8 @@ def query_clickhouse(code: list = None,
         数据周期, by default 'daily'
     database : str, optional
         clickhouse数据库名,默认从聚宽数据查询, by default 'jqdata'
-
+    client: driver.client.Client, optional
+        clickhouse client
     Returns
     -------
     np.ndarray
@@ -372,11 +386,11 @@ def query_clickhouse(code: list = None,
     #  判断起始日期合法
     if start_time > end_time:
         raise ValueError('开始时间大于结束时间')
-
-    client = get_client(host=config.clickhouse_IP,
-                        username=config.clickhouse_user,
-                        password=config.clickhouse_password,
-                        database=database)
+    if not client:
+        client = get_client(host=config.clickhouse_IP,
+                            username=config.clickhouse_user,
+                            password=config.clickhouse_password,
+                            database=database)
 
     if code:
         if isinstance(code, str):
@@ -427,7 +441,7 @@ def query_N_clickhouse(count: int,
                        end_time: str = '2200-01-01',
                        frequency='daily',
                        database='jqdata',
-
+                       client: driver.client.Client = None,
                        **kwargs) -> np.ndarray:
     """
     获取结束日期之前的N个时间序列数据
@@ -446,6 +460,8 @@ def query_N_clickhouse(count: int,
         k线周期, by default 'daily'
     database : str, optional
         clickhouse数据库名, by default 'jqdata'
+    client: driver.client.Client, optional
+        clickhouse client
 
     Returns
     -------
@@ -496,11 +512,11 @@ def query_N_clickhouse(count: int,
         else:
             # 从数据库保存的起点查询
             start_time = '2014-01-01'
-
-    client = get_client(host=config.clickhouse_IP,
-                        username=config.clickhouse_user,
-                        password=config.clickhouse_password,
-                        database=database)
+    if not client:
+        client = get_client(host=config.clickhouse_IP,
+                            username=config.clickhouse_user,
+                            password=config.clickhouse_password,
+                            database=database)
     # DESC 降序 使 LIMIT 返回离 end_time 最近的数据
     if code:
         if isinstance(code, str):
